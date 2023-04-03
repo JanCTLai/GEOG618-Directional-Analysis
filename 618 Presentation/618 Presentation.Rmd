@@ -54,7 +54,6 @@ wind<- wind %>%
          mean_speed = mean(windspeed),
          c_sin=sum(sin(winddir*(pi/180))),
          c_cos=sum(cos(winddir*(pi/180))),
-         circular=(atan(c_sin/c_cos))/pi*180,
          c_dir=ifelse(c_sin>=0,
                       ifelse(c_cos>=0,atan(c_sin/c_cos)/pi*180,180+atan(c_sin/c_cos)/pi*180),
                       ifelse(c_cos>=0,360+atan(c_sin/c_cos)/pi*180,180+atan(c_sin/c_cos)/pi*180))
@@ -137,7 +136,6 @@ wind<-wind %>%
          mean_speed = mean(windspeed),
          w_sin=sum(windspeed*sin(winddir*(pi/180))),
          w_cos=sum(windspeed*cos(winddir*(pi/180))),
-         w_circular=atan(w_sin/w_cos)/pi*180,
          w_dir=ifelse(w_sin>=0,
                       ifelse(w_cos>=0,atan(w_sin/w_cos)/pi*180,180+atan(w_sin/w_cos)/pi*180),
                       ifelse(w_cos>=0,360+atan(w_sin/w_cos)/pi*180,180+atan(w_sin/w_cos)/pi*180)))%>%
