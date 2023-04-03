@@ -1,0 +1,208 @@
+---
+title: "GG618"
+output: html_document
+date: "2023-03-31"
+---
+
+```{r,echo=FALSE, message=FALSE,warning = FALSE, error = FALSE, results='hide'}
+#####reading packages
+local({r <- getOption("repos")
+       r["CRAN"] <- "http://cran.r-project.org" 
+       options(repos=r)})
+
+if(!require("tidyverse"))install.packages("tidyverse")
+if(!require("dplyr"))install.packages('dplyr')
+if(!require("openair"))install.packages('openair')
+if(!require("viridis"))install.packages('viridis')
+if(!require("here"))install.packages('here')
+if(!require("Directional"))install.packages('Directional')
+if(!require("bpnreg"))install.packages('bpnreg')
+if(!require("circular"))install.packages('circular')
+if(!require("ggplot2"))install.packages('ggplot2')
+if(!require("windrose"))install.packages('windrose')
+if(!require("clifro"))install.packages('clifro')
+if(!require("geomtextpath"))install.packages('geomtextpath')
+if(!require("glue"))install.packages('glue')
+if(!require("scales"))install.packages('scales')
+
+library(scales)
+library(glue)
+library(geomtextpath)
+library(tidyverse)
+library(dplyr)
+library(openair)
+library(viridis)
+library(here)
+library(Directional)
+library(bpnreg)
+library(circular)
+library(ggplot2)
+require(windrose)
+library(clifro)
+
+##### Set working directory
+setwd(here())
+```
+
+### Circular Mean and data
+```{r,echo=FALSE, message=FALSE,warning = FALSE, error = FALSE, results='hide'}
+wind<-read_csv(here("data", "calgary 2022-01-01 to 2022-12-31.csv"))
+wind<- wind %>%  
+  group_by(month(datetime), 
+           year(datetime)) %>%
+  mutate(mean_dir = mean(winddir), 
+         mean_speed = mean(windspeed),
+         c_sin=sum(sin(winddir*(pi/180))),
+         c_cos=sum(cos(winddir*(pi/180))),
+         circular=(atan(c_sin/c_cos))/pi*180,
+         c_dir=ifelse(c_sin>=0,
+                      ifelse(c_cos>=0,atan(c_sin/c_cos)/pi*180,180+atan(c_sin/c_cos)/pi*180),
+                      ifelse(c_cos>=0,360+atan(c_sin/c_cos)/pi*180,180+atan(c_sin/c_cos)/pi*180))
+         )%>%
+  select(
+    month(wind$datetime), 
+    mean_dir,
+    c_dir,
+    mean_speed, 
+    latitude,
+    longitude
+  )%>% 
+  mutate(month = month(datetime))
+##### save month as factor, and class the factors
+wind$month <- wind$month%>% as.factor()
+wind$month_abb <- month.abb[wind$month] %>% as.factor()%>%
+  factor(levels = month.abb)
+wind$month_abb%>% class()
+wind$text_l <- glue("linear\n{round(wind$mean_dir, 2)}")
+wind$text_c <- glue("circular\n{round(wind$c_dir, 2)}")
+##### plot wind direction roses map
+ggplot(wind) + 
+  geom_bar(aes(x =winddir,fill = ..count..),stat = "bin", binwidth = 10)+
+  geom_segment(aes(x=c_dir, y=0, xend=c_dir, yend=mean_speed*4),color='#660099',linewidth = 1,arrow = arrow(length=unit(5, 'pt')))+
+  scale_fill_gradient(low = "green", high = "red", trans = "sqrt") +
+  geom_textvline(aes(xintercept = c_dir, label = text_c),size = 3.5, hjust = 1,linetype = "dashed", vjust = 0.5, color = "black")+
+  coord_curvedpolar(theta = "x", start = 3*pi/2,direction=-1)+
+  scale_x_continuous(limits = c(0, 360),
+                     breaks = seq(0, 360, by =22.5),
+                     labels = c("E","22.5","NE","67.5","N","112.5","NW","157.5","W","202.5","SW","247.5","S","292.5","SE","337.5","E")) +
+  ggtitle("Wind Direction by Month", subtitle = "Jan 1 - Dec 31, 2022\n Calgary") + 
+  xlab("Wind Direction Recorded hourly") + ylab("") +
+  guides(fill = guide_legend(title = "Direction")) + 
+  theme(plot.title = element_text(size = 18, face = "bold", color = "blue"),
+        axis.title.x = element_text(size = 6),
+        axis.text.x = element_text(size =10,vjust = 0.2),
+        axis.text.y = element_blank(), axis.line = element_blank(), 
+        axis.ticks.y = element_blank(), legend.position = "bottom")+
+ facet_wrap(~month_abb)
+
+##### save it as Linear Mean.png
+ggsave("Circular Mean and data.png", width = 9, height =9)
+```
+
+### Circular Mean and Linear Mean
+```{r,echo=FALSE, message=FALSE,warning = FALSE, error = FALSE, results='hide'}
+
+##### plot wind direction roses map
+ggplot(wind) + 
+  geom_bar(aes(x =winddir),fill = 'cornsilk3',stat = "bin", binwidth = 10) +
+  geom_segment(aes(x=mean_dir, y=0, xend=mean_dir, yend=mean_speed*4),color='#660099',linewidth = 1,arrow = arrow(length=unit(5, 'pt')))+
+  geom_segment(aes(x=c_dir, y=0, xend=c_dir, yend=mean_speed*4),color="chartreuse3",linewidth = 1,arrow = arrow(length=unit(5, 'pt')))+
+  geom_textvline(aes(xintercept =mean_dir , label = text_l),size = 3.5, hjust = 1, vjust = 0.5, color = "black",linetype="0")+
+  geom_textvline(aes(xintercept = c_dir, label = text_c), size = 3.5, hjust = 1, vjust = 0.5, color = "black",linetype="0")+
+  scale_x_continuous(limits = c(0, 360),
+                     breaks = seq(0, 360, by =22.5),
+                     labels = c("E","22.5","NE","67.5","N","112.5","NW","157.5","W","202.5","SW","247.5","S","292.5","SE","337.5","E")) +
+  coord_curvedpolar(theta = "x", start = 3*pi/2,direction=-1) +
+  ggtitle("Wind Direction by Month", subtitle = "Jan 1 - Dec 31, 2022\n Calgary") + 
+  xlab("Wind Direction Recorded hourly") + ylab("") +
+  guides(fill = guide_legend(title = "Direction")) + 
+  theme(plot.title = element_text(size = 18, face = "bold", color = "blue"),
+        axis.title.x = element_text(size = 6),
+        axis.text.x = element_text(size =10,vjust = 0.2),
+        axis.text.y = element_blank(), axis.line = element_blank(), 
+        axis.ticks.y = element_blank(), legend.position = "bottom")+
+ facet_wrap(~month_abb)
+##### save it as Linear Mean.png
+ggsave("Right VS Wrong.png", width = 9, height =9)
+```
+
+### Weight Mean
+```{r,echo=FALSE, message=FALSE,warning = FALSE, error = FALSE, results='hide'}
+#####
+wind<-read_csv(here("data", "calgary 2022-01-01 to 2022-12-31.csv"))
+wind<-wind %>% 
+  group_by(month(datetime), 
+           year(datetime)) %>%
+  mutate(mean_dir = mean(winddir), 
+         mean_speed = mean(windspeed),
+         w_sin=sum(windspeed*sin(winddir*(pi/180))),
+         w_cos=sum(windspeed*cos(winddir*(pi/180))),
+         w_circular=atan(w_sin/w_cos)/pi*180,
+         w_dir=ifelse(w_sin>=0,
+                      ifelse(w_cos>=0,atan(w_sin/w_cos)/pi*180,180+atan(w_sin/w_cos)/pi*180),
+                      ifelse(w_cos>=0,360+atan(w_sin/w_cos)/pi*180,180+atan(w_sin/w_cos)/pi*180)))%>%
+  select(
+    month(wind$datetime), 
+    mean_dir,
+    w_dir,
+    mean_speed, 
+    latitude,
+    longitude
+  )%>% 
+  mutate(month = month(datetime))
+##### save month as factor, and class the factors
+wind$month <- wind$month%>% as.factor()
+wind$month_abb <- month.abb[wind$month] %>% as.factor()%>%
+  factor(levels = month.abb)
+wind$month_abb%>% class()
+wind$text_w <- glue("weighted\n{round(wind$w_dir, 2)}")
+##### plot wind direction roses map
+ggplot(wind) + 
+  geom_bar(aes(x = winddir,fill = ..count..),stat = "bin", binwidth = 10) +
+  scale_fill_gradient(low = "green", high = "red", trans = "sqrt") +
+  geom_segment(aes(x=w_dir, y=0, xend=w_dir, yend=mean_speed*4),color="black", 
+                 linewidth = 1,
+                 arrow = arrow(length=unit(5, 'pt')))+
+  geom_textvline(aes(xintercept = w_dir, label = text_w),
+                 size = 3.5, hjust = 1,
+                 linetype = "0", vjust = 0.5, color = "blue4")+
+  coord_curvedpolar(theta = "x", start = 3*pi/2,direction=-1) +
+  scale_x_continuous(limits = c(0, 360),
+                     breaks = seq(0, 360, by =22.5),
+                     labels = c("E","22.5","NE","67.5","N","112.5","NW","157.5","W","202.5","SW","247.5","S","292.5","SE","337.5","E")) +
+  ggtitle("Wind Direction by Month", subtitle = "Jan 1 - Dec 31, 2022\n Calgary") + 
+  xlab("Wind Direction Recorded hourly") + ylab("") +
+  guides(fill = guide_legend(title = "Direction")) + 
+  theme(plot.title = element_text(size = 18, face = "bold", color = "blue"),
+        axis.title.x = element_text(size = 6),
+        axis.text.x = element_text(size =10,vjust = 0.2),
+        axis.text.y = element_blank(), axis.line = element_blank(), 
+        axis.ticks.y = element_blank(), legend.position = "bottom")+
+ facet_wrap(~month_abb)
+##### save it as wrongdir.png
+ggsave("Weight Mean.png", width = 9, height =9)
+```
+
+# Circular Mean  MRL
+```{r,echo=FALSE, message=FALSE,warning = FALSE, error = FALSE, results='hide'}
+wind<-read_csv(here("data", "calgary 2022-01-01 to 2022-12-31.csv"))
+wind<- wind %>% 
+  group_by(month(datetime), 
+           year(datetime)) %>%
+  mutate(mean_dir = mean(winddir), 
+         mean_speed = mean(windspeed),
+         c_sin=mean(sin(winddir*(pi/180))),
+         c_cos=mean(cos(winddir*(pi/180))),
+         MRL=n()*(c_sin^2+c_cos^2)
+         )%>%
+  select(
+    month(wind$datetime), 
+    mean_dir,
+    mean_speed, 
+    latitude,
+    longitude,
+    MRL
+  )%>% 
+  mutate(month = month(datetime))
+ifelse(unique(wind$MRL)>2.9957,"PASS","REJECT")
+```
